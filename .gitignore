@@ -1,0 +1,79 @@
+# ===========================
+# Rust / Cargo
+# ===========================
+target/
+debug/
+release/
+Cargo.lock
+
+# Optional: Keep Cargo.lock for binaries, ignore for libraries
+# Uncomment the next line if this is a library crate:
+# Cargo.lock
+
+# ===========================
+# Build Artifacts
+# ===========================
+*.rlib
+*.dll
+*.so
+*.dylib
+*.exe
+*.pdb
+
+# ===========================
+# Environment & Config Files
+# ===========================
+.env
+.env.*
+
+# ===========================
+# Logs & Temp Files
+# ===========================
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+*.DS_Store
+Thumbs.db
+
+# ===========================
+# IDE / Editor Settings
+# ===========================
+# VS Code
+.vscode/
+# IntelliJ / CLion / RustRover
+.idea/
+# Visual Studio
+.vs/
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# ===========================
+# Coverage / Test Output
+# ===========================
+coverage/
+htmlcov/
+*.profraw
+*.profdata
+
+# ===========================
+# Dependency / Tool Caches
+# ===========================
+.cargo/
+pkg/
+node_modules/
+.nix/
+nix/
+.cache/
+target/
+
+# ===========================
+# Docker / Container
+# ===========================
+Dockerfile.old
+docker-compose.override.yml
+docker-data/
+
+
