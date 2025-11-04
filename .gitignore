@@ -25,6 +25,9 @@ Cargo.lock
 # ===========================
 .env
 .env.*
+# But keep the example file
+!env.example
+!.env.example
 
 # ===========================
 # Logs & Temp Files
