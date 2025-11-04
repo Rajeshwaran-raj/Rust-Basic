@@ -1,66 +1,45 @@
-# In-Memory Rust Backend (Axum)
+# MySQL Rust Backend (Axum + SQLx) — Migrations & Seeders on Startup
 
-## Run
-```bash
-cargo run
-# server: http://localhost:8080
+This backend uses **Axum** (HTTP), **SQLx** (async MySQL), auto-runs **migrations** on boot, and **seeds** initial data if the table is empty.
+
+## Quickstart
+
+1) Install Rust & MySQL, then create a database:
+```sql
+CREATE DATABASE mysql_backend CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-## Endpoints
+2) Configure your DB URL (or use the default in `.env`):
+```
+DATABASE_URL=mysql://root:password@127.0.0.1:3306/mysql_backend
+```
+
+3) Run:
+```bash
+cargo run
+# ➜ http://localhost:8080
+```
+
+On start:
+- Runs migrations in `./migrations`
+- Seeds two items if the table is empty
+
+## API
+
 - `GET /health` → `"ok"`
-- `GET /items` → list
+- `GET /items` → list items
 - `POST /items` → create `{ "title": "..." }`
 - `GET /items/:id` → get one
 - `PUT /items/:id` → partial update `{ "title": "...", "done": true }`
 - `DELETE /items/:id` → remove
-```bash
-curl http://localhost:8080/health
-curl -X POST http://localhost:8080/items -H "content-type: application/json" -d '{"title":"first"}'
-```
 
-## What the app uses and the exact versions.
-```
-Stack & Versions
+## Stack
+- axum 0.7
+- sqlx 0.7 (mysql, runtime-tokio-rustls, uuid, chrono)
+- tokio 1, serde 1, uuid 1, chrono 0.4
+- tower-http 0.5, tracing 0.1
 
-Rust edition: 2021 (works on stable Rust)
-
-Axum: 0.7 (HTTP routing & handlers)
-
-Tokio: 1 (async runtime)
-
-Serde: 1 with derive (JSON (de)serialization)
-
-serde_json: 1
-
-uuid: 1 with features v4,serde (IDs)
-
-thiserror: 1 (error ergonomics)
-
-tower-http: 0.5 with features cors,trace (CORS + request tracing)
-
-tracing: 0.1 (structured logs)
-
-tracing-subscriber: 0.3 with env-filter (log formatting & filtering)
-
-What’s used in the code (“the things”)
-
-Framework: Axum router with GET/POST/PUT/DELETE routes.
-
-Runtime: Tokio async (#[tokio::main]).
-
-Storage: In-memory HashMap<Uuid, Item> guarded by Arc<RwLock<...>>.
-
-Model: Item { id, title, done }.
-
-JSON: Serde for request/response bodies.
-
-IDs: Uuid::new_v4().
-
-Middleware: tower_http::CorsLayer (open CORS) and TraceLayer (request logs).
-
-Logging: tracing + tracing-subscriber (env-configurable).
-
-Port: 0.0.0.0:8080.
-
-Health check: GET /health.
-```
+## Notes
+- Migrations run with `sqlx::migrate!("./migrations")` at startup.
+- Seeder runs once only when `SELECT COUNT(*) FROM items = 0`.
+- UUIDs are stored as `CHAR(36)` strings (easy to read/debug).
