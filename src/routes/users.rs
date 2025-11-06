@@ -1,1 +1,171 @@
-use rocket::serde::{Serialize,Deserialize,json::Json};use uuid::Uuid;use rocket::State;use sqlx::FromRow;use crate::{state::AppState,error::ApiError};#[derive(Debug,Clone,Serialize,FromRow)]#[serde(crate="rocket::serde")]pub struct User{pub id:Uuid,pub name:String,pub email:String,pub created_at:chrono::NaiveDateTime,pub updated_at:chrono::NaiveDateTime,}#[derive(Deserialize)]#[serde(crate="rocket::serde")]pub struct CreateUser{pub name:String,pub email:String}#[derive(Deserialize)]#[serde(crate="rocket::serde")]pub struct UpdateUser{pub name:Option<String>,pub email:Option<String>}#[get("/users")]pub async fn list_users(s:&State<AppState>)->Result<Json<Vec<User>>,ApiError>{let rows:Vec<User>=sqlx::query_as("SELECT id,name,email,created_at,updated_at FROM users ORDER BY created_at DESC").fetch_all(&s.db).await?;Ok(Json(rows))}#[get("/users/<id>")]pub async fn get_user(s:&State<AppState>,id:&str)->Result<Json<User>>,ApiError>{let id=Uuid::parse_str(id).map_err(|e|ApiError::BadRequest(e.to_string()))?;let row=sqlx::query_as::<_,User>("SELECT id,name,email,created_at,updated_at FROM users WHERE id = ?").bind(id).fetch_optional(&s.db).await?;row.map(Json).ok_or(ApiError::NotFound)}#[post("/users",data="<p>")]pub async fn create_user(s:&State<AppState>,p:Json<CreateUser>)->Result<Json<User>>,ApiError>{let id=Uuid::new_v4();let now=chrono::Utc::now().naive_utc();sqlx::query("INSERT INTO users (id,name,email,created_at,updated_at) VALUES (?,?,?,?,?)").bind(id).bind(&p.name).bind(&p.email).bind(now).bind(now).execute(&s.db).await?;let created=sqlx::query_as::<_,User>("SELECT id,name,email,created_at,updated_at FROM users WHERE id = ?").bind(id).fetch_one(&s.db).await?;Ok(Json(created))}#[put("/users/<id>",data="<p>")]pub async fn update_user(s:&State<AppState>,id:&str,p:Json<UpdateUser>)->Result<Json<User>>,ApiError>{let id=Uuid::parse_str(id).map_err(|e|ApiError::BadRequest(e.to_string()))?;let ex=sqlx::query_as::<_,User>("SELECT id,name,email,created_at,updated_at FROM users WHERE id = ?").bind(id).fetch_optional(&s.db).await?;let Some(ex)=ex else {return Err(ApiError::NotFound)};let name=p.name.clone().unwrap_or(ex.name);let email=p.email.clone().unwrap_or(ex.email);let now=chrono::Utc::now().naive_utc();sqlx::query("UPDATE users SET name=?, email=?, updated_at=? WHERE id=?").bind(name).bind(email).bind(now).bind(id).execute(&s.db).await?;let updated=sqlx::query_as::<_,User>("SELECT id,name,email,created_at,updated_at FROM users WHERE id = ?").bind(id).fetch_one(&s.db).await?;Ok(Json(updated))}#[delete("/users/<id>")]pub async fn delete_user(s:&State<AppState>,id:&str)->Result<Json<rocket::serde::json::Value>>,ApiError>{let id=Uuid::parse_str(id).map_err(|e|ApiError::BadRequest(e.to_string()))?;let res=sqlx::query("DELETE FROM users WHERE id = ?").bind(id).execute(&s.db).await?;if res.rows_affected()==0{return Err(ApiError::NotFound);}Ok(Json(rocket::serde::json::json!({"deleted":true})))}
+use rocket::serde::{json::Json, Deserialize, Serialize};
+use uuid::Uuid;
+use rocket::State;
+use sqlx::FromRow;
+
+use crate::{error::ApiError, state::AppState};
+
+#[derive(Debug, Clone, Serialize, FromRow)]
+#[serde(crate = "rocket::serde")]
+pub struct User {
+    pub id: Uuid,
+    pub name: String,
+    pub email: String,
+    pub created_at: chrono::NaiveDateTime,
+    pub updated_at: chrono::NaiveDateTime,
+}
+
+#[derive(Deserialize)]
+#[serde(crate = "rocket::serde")]
+pub struct CreateUser {
+    pub name: String,
+    pub email: String,
+}
+
+#[derive(Deserialize)]
+#[serde(crate = "rocket::serde")]
+pub struct UpdateUser {
+    pub name: Option<String>,
+    pub email: Option<String>,
+}
+
+#[get("/users")]
+pub async fn list_users(s: &State<AppState>) -> Result<Json<Vec<User>>, ApiError> {
+    let rows: Vec<User> = sqlx::query_as(
+        "SELECT id, name, email, created_at, updated_at
+         FROM users
+         ORDER BY created_at DESC",
+    )
+    .fetch_all(&s.db)
+    .await?;
+
+    Ok(Json(rows))
+}
+
+#[get("/users/<id>")]
+pub async fn get_user(s: &State<AppState>, id: &str) -> Result<Json<User>, ApiError> {
+    let id = Uuid::parse_str(id).map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
+    let row = sqlx::query_as::<_, User>(
+        "SELECT id, name, email, created_at, updated_at
+         FROM users
+         WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(&s.db)
+    .await?;
+
+    row.map(Json).ok_or(ApiError::NotFound)
+}
+
+#[post("/users", data = "<p>")]
+pub async fn create_user(
+    s: &State<AppState>,
+    p: Json<CreateUser>,
+) -> Result<Json<User>, ApiError> {
+    if p.name.trim().is_empty() {
+        return Err(ApiError::BadRequest("name cannot be empty".into()));
+    }
+    if p.email.trim().is_empty() || !p.email.contains('@') {
+        return Err(ApiError::BadRequest("invalid email".into()));
+    }
+
+    let id = Uuid::new_v4();
+    let now = chrono::Utc::now().naive_utc();
+
+    sqlx::query(
+        "INSERT INTO users (id, name, email, created_at, updated_at)
+         VALUES (?,?,?,?,?)",
+    )
+    .bind(id)
+    .bind(&p.name)
+    .bind(&p.email)
+    .bind(now)
+    .bind(now)
+    .execute(&s.db)
+    .await?;
+
+    let created: User = sqlx::query_as(
+        "SELECT id, name, email, created_at, updated_at
+         FROM users
+         WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_one(&s.db)
+    .await?;
+
+    Ok(Json(created))
+}
+
+#[put("/users/<id>", data = "<p>")]
+pub async fn update_user(
+    s: &State<AppState>,
+    id: &str,
+    p: Json<UpdateUser>,
+) -> Result<Json<User>, ApiError> {
+    let id = Uuid::parse_str(id).map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
+    let existing = sqlx::query_as::<_, User>(
+        "SELECT id, name, email, created_at, updated_at
+         FROM users
+         WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(&s.db)
+    .await?;
+
+    let Some(ex) = existing else {
+        return Err(ApiError::NotFound);
+    };
+
+    let name = p.name.clone().unwrap_or(ex.name);
+    let email = p.email.clone().unwrap_or(ex.email);
+    if name.trim().is_empty() {
+        return Err(ApiError::BadRequest("name cannot be empty".into()));
+    }
+    if email.trim().is_empty() || !email.contains('@') {
+        return Err(ApiError::BadRequest("invalid email".into()));
+    }
+
+    let now = chrono::Utc::now().naive_utc();
+
+    sqlx::query(
+        "UPDATE users SET name = ?, email = ?, updated_at = ? WHERE id = ?",
+    )
+    .bind(&name)
+    .bind(&email)
+    .bind(now)
+    .bind(id)
+    .execute(&s.db)
+    .await?;
+
+    let updated: User = sqlx::query_as(
+        "SELECT id, name, email, created_at, updated_at
+         FROM users
+         WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_one(&s.db)
+    .await?;
+
+    Ok(Json(updated))
+}
+
+#[delete("/users/<id>")]
+pub async fn delete_user(
+    s: &State<AppState>,
+    id: &str,
+) -> Result<Json<rocket::serde::json::Value>, ApiError> {
+    let id = Uuid::parse_str(id).map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
+    let res = sqlx::query("DELETE FROM users WHERE id = ?")
+        .bind(id)
+        .execute(&s.db)
+        .await?;
+
+    if res.rows_affected() == 0 {
+        return Err(ApiError::NotFound);
+    }
+
+    Ok(Json(rocket::serde::json::json!({ "deleted": true })))
+}
