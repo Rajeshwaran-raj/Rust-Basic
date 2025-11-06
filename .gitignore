@@ -78,4 +78,3 @@ target/
 Dockerfile.old
 docker-compose.override.yml
 docker-data/
-
